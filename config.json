@@ -11,6 +11,7 @@
   "vocab_size": 4000,
   "tokenizer_path": "tokenizer/spm.model",
   "model_path": "model/model.onnx",
+  "data_dir": "/Users/yotamazriel/tensorleap/data/sentence-classification",
   "input_name": "tokens",
   "output_name": "logits",
   "embedding_dim": 32,

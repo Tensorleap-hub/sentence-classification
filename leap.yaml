@@ -1,0 +1,15 @@
+projectId: 6a3904f196cb1f187edfa352
+secretId: ""
+entryFile: leap_integration.py
+include:
+    - leap.yaml
+    - leap_integration.py
+    - requirements.txt
+    - config.json
+    - tokenizer/**
+    - sentence_clf/**.py
+exclude:
+    - .git/**
+    - .venv/**
+    - data/**
+pythonVersion: py310
