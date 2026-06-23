@@ -1,0 +1,19 @@
+{
+  "labels": [
+    "Absent",
+    "Hypothetical",
+    "Present"
+  ],
+  "window": 20,
+  "input_len": 40,
+  "pad_id": 0,
+  "requested_vocab": 40000,
+  "vocab_size": 4000,
+  "tokenizer_path": "tokenizer/spm.model",
+  "model_path": "model/model.onnx",
+  "input_name": "tokens",
+  "output_name": "logits",
+  "embedding_dim": 32,
+  "hidden_dim": 64,
+  "num_classes": 3
+}
