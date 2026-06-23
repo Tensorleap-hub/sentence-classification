@@ -57,9 +57,9 @@ from sentence_clf.text import (
 # --- paths / config ---------------------------------------------------------
 # config.json is the single source of truth shared with training. Model and
 # tokenizer are bundled code/assets (listed in leap.yaml). The DATASET is NOT
-# bundled — it lives in the Tensorleap data volume — so its directory is
-# config-driven: SENTENCE_CLF_DATA_DIR if set, else config.json's "data_dir" (the
-# data-volume project folder), else the local default. Never hardcode it in code.
+# bundled: it's hosted public-read in S3 and pulled into DATA_DIR on demand (see
+# ensure_dataset). DATA_DIR is config-driven: SENTENCE_CLF_DATA_DIR if set, else
+# config.json's "data_dir" if present, else a portable local default.
 ROOT = Path(__file__).resolve().parent
 CONFIG = json.loads((ROOT / "config.json").read_text())
 DATA_DIR = Path(
@@ -67,6 +67,12 @@ DATA_DIR = Path(
     or CONFIG.get("data_dir")
     or str(ROOT / "data" / "processed")
 )
+
+# Public S3 location of the dataset (anonymous read; see ensure_dataset).
+DATASET_S3_BUCKET = CONFIG.get("dataset_s3_bucket", "tensorleap-assets")
+DATASET_S3_PREFIX = CONFIG.get("dataset_s3_prefix", "public-datasets/sentence-classification")
+DATASET_S3_REGION = CONFIG.get("dataset_s3_region", "us-east-1")
+DATASET_FILES = ("train.csv", "val.csv", "labels.json")
 
 MODEL_PATH = ROOT / CONFIG["model_path"]
 TOKENIZER_PATH = ROOT / CONFIG["tokenizer_path"]
@@ -78,6 +84,28 @@ _SP = spm.SentencePieceProcessor(model_file=str(TOKENIZER_PATH))
 
 
 # --- preprocess -------------------------------------------------------------
+def ensure_dataset() -> None:
+    """Pull the dataset into DATA_DIR if it isn't already there.
+
+    The split is hosted public-read in S3, so this uses anonymous (unsigned) S3
+    access — no AWS credentials, works in any environment. No-op when the files
+    are already present (committed locally, or in a mounted data volume).
+    """
+    if all((DATA_DIR / f).exists() for f in ("train.csv", "val.csv")):
+        return
+    import boto3
+    from botocore import UNSIGNED
+    from botocore.config import Config as _BotoConfig
+
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    s3 = boto3.client("s3", region_name=DATASET_S3_REGION,
+                      config=_BotoConfig(signature_version=UNSIGNED))
+    for fname in DATASET_FILES:
+        dest = DATA_DIR / fname
+        if not dest.exists():
+            s3.download_file(DATASET_S3_BUCKET, f"{DATASET_S3_PREFIX}/{fname}", str(dest))
+
+
 def _load_split(csv_name: str) -> "tuple[List[str], Dict[str, dict]]":
     """Read one split CSV into (sample_ids, records_by_id).
 
@@ -97,6 +125,7 @@ def _load_split(csv_name: str) -> "tuple[List[str], Dict[str, dict]]":
 
 @tensorleap_preprocess()
 def preprocess() -> List[PreprocessResponse]:
+    ensure_dataset()
     train_ids, train_records = _load_split("train.csv")
     val_ids, val_records = _load_split("val.csv")
     training = PreprocessResponse(
